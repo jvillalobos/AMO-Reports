@@ -9,6 +9,7 @@ import calendar;
 import pymysql;
 
 DATE_FORMAT = "%Y-%m-%d";
+SHORT_MONTH_FORMAT = "%b";
 AMO_DB = "addons_mozilla_org";
 SQL_POINTS = "\
   SELECT sum(rs.score) AS total, \
@@ -66,7 +67,21 @@ SQL_CONTRIBUTIONS_INFO ="\
         l.created >= %s AND l.created < %s \
   GROUP BY l.user_id \
   ORDER BY editortotal DESC;";
-
+SQL_CONTRIBUTIONS_SUM = "\
+  SELECT count(*) \
+  FROM log_activity AS l \
+  WHERE l.action IN (21, 42, 43, 22, 23, 44, 45) AND \
+        l.arguments LIKE '%%\"addons.addon\"%%' AND \
+        l.created >= %s AND l.created < %s;";
+SQL_CONTRIBUTIONS_SUM_COMMUNITY = "\
+  SELECT count(*) \
+  FROM log_activity AS l \
+  WHERE l.action IN (21, 42, 43, 22, 23, 44, 45) AND \
+        l.arguments LIKE '%%\"addons.addon\"%%' AND \
+        l.created >= %s AND l.created < %s AND \
+        l.user_id NOT IN ( \
+          SELECT DISTINCT(gu.user_id) FROM groups_users AS gu \
+          WHERE gu.group_id IN (50000, 50066))";
 SQL_MONTH_TOTAL ="\
   SET @from_date=%s;SET @to_date=%s; \
   SELECT \
@@ -128,6 +143,8 @@ def runReports(endDate):
 
   startDateStr = startDate.strftime(DATE_FORMAT);
   endDateStr = endDate.strftime(DATE_FORMAT);
+  endDateMonthStr = endDate.strftime(SHORT_MONTH_FORMAT);
+
   firstOfMonthStr = firstOfMonth.strftime(DATE_FORMAT);
   firstOfNextMonthStr = firstOfNextMonth.strftime(DATE_FORMAT);
   #print("Start: " + startDateStr);
@@ -143,12 +160,12 @@ def runReports(endDate):
   print("Getting contribution data...");
   getContributionData(db, startDateStr, endDateStr);
   print("Getting monthly totals data...");
-  #getMonthTotalData(db, firstOfMonthStr, firstOfNextMonthStr);
+  getMonthTotalData(db, firstOfMonthStr, firstOfNextMonthStr);
 
   db.close();
 
   print("Writting files...");
-  emailOutput = getEmailOutput(startDateStr, endDateStr);
+  emailOutput = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
   print(emailOutput);
 
   print("All done!");
@@ -215,6 +232,18 @@ def getContributionData(db, startDateStr, endDateStr):
   cursor.close();
   #print(results["contribInfo"]);
 
+  cursor = db.cursor();
+  cursor.execute(SQL_CONTRIBUTIONS_SUM, (startDateStr, endDateStr));
+  results["contribSum"] = cursor.fetchone()[0];
+  cursor.close();
+  #print(results["contribSum"]);
+
+  cursor = db.cursor();
+  cursor.execute(SQL_CONTRIBUTIONS_SUM_COMMUNITY, (startDateStr, endDateStr));
+  results["contribSumCommunity"] = cursor.fetchone()[0];
+  cursor.close();
+  #print(results["contribSumCommunity"]);
+
   return;
 
 def getMonthTotalData(db, firstOfMonthStr, firstOfNextMonthStr):
@@ -223,13 +252,13 @@ def getMonthTotalData(db, firstOfMonthStr, firstOfNextMonthStr):
   # There are 2 SET operations that return empty sets.
   cursor.nextset();
   cursor.nextset();
-  results["monthTotal"] = cursor.fetchall();
+  results["monthTotal"] = cursor.fetchone();
   cursor.close();
-  #print(results["monthTotal"]);
+  print(results["monthTotal"]);
 
   return;
 
-def getEmailOutput(startDateStr, endDateStr):
+def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
   output = "WEEKLY ADD-ON REVIEWS REPORT\n";
   output += startDateStr + " - " + endDateStr + "\n";
   output += getDoubleTextLine() + "\n";
@@ -252,7 +281,36 @@ def getEmailOutput(startDateStr, endDateStr):
   output += "Total   Nom   Upd   Pre   Sup   Inf   Name\n";
 
   merged = getMergedContributionData();
-  # TODO: print merged data.
+
+  for contribEntry in merged:
+    total = contribEntry[2];
+
+    if (5 <= total):
+      output += str(total).rjust(5) + str(contribEntry[3]).rjust(6);
+      output += str(contribEntry[4]).rjust(6) + str(contribEntry[5]).rjust(6);
+      output += str(contribEntry[6]).rjust(6) + str(contribEntry[7]).rjust(6);
+      output += "   " + contribEntry[1] + "\n";
+    else:
+      break;
+
+  output += "\n* - Non-volunteers\n\n";
+
+  output += "Nom - Nominations, approved or denied.\n";
+  output += "Upd - Updates, approved or denied.\n";
+  output += "Sup - Updates and nominations escalated to super-review\n";
+  output += "Inf - Information requests to authors for updates and nominations\n";
+  output += "\nVolunteer contribution ratio:\n";
+
+  output += "\nTotal reviews: " + str(results["contribSum"]);
+  output += "\nVolunteer reviews: " + str(results["contribSumCommunity"]);
+  output += " (" + str(rate(results["contribSumCommunity"], results["contribSum"])) + "%)";
+
+  output += "\n\nTotal contributions:\n\n";
+  output += "     Nominations    Updates    Prelim.  Admin flag   Info req  Total\n";
+  output += endDateMonthStr.ljust(5) + str(monthlyRateStr(0)).rjust(11);
+  output += str(monthlyRateStr(1)).rjust(11) + str(monthlyRateStr(2)).rjust(11);
+  output += str(monthlyRateStr(3)).rjust(12) + str(monthlyRateStr(4)).rjust(11);
+  output += str(results["monthTotal"][5]).rjust(7);
 
   return output;
 
@@ -286,5 +344,14 @@ def getTextLine():
 def getDoubleTextLine():
   return "==========================================================\n";
 
+def rate(part, total):
+  return int((float(part) / float(total)) * 100);
+
+def monthlyRateStr(index):
+  monthItem = results["monthTotal"][index];
+  rateStr = str(monthItem) + " (";
+  rateStr += str(rate(monthItem, results["monthTotal"][5])) + "%)";
+
+  return rateStr;
 
 main();
