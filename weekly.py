@@ -38,14 +38,14 @@ SQL_CONTRIBUTIONS_TOTAL ="\
   SELECT u.id, u.display_name, count(*) AS editortotal \
   FROM log_activity AS l, users AS u \
   WHERE l.action IN (21, 42, 43, 22, 23, 44, 45) AND l.user_id = u.id AND \
-        l.arguments LIKE '%%\"addons.addon\"%%' AND \
+        l.user_id != 4757633 AND l.arguments LIKE '%%\"addons.addon\"%%' AND \
         l.created >= %s AND l.created < %s \
   GROUP BY l.user_id \
   ORDER BY editortotal DESC;";
 SQL_CONTRIBUTIONS_REVIEW ="\
   SELECT l.user_id, count(*) AS editortotal \
   FROM log_activity AS l \
-  WHERE l.action IN (21, 42, 43, 22) AND \
+  WHERE l.action IN (21, 42, 43, 22) AND l.user_id != 4757633 AND \
         l.details LIKE %s AND \
         l.arguments LIKE '%%\"addons.addon\"%%' AND \
         l.created >= %s AND l.created < %s \
@@ -57,7 +57,7 @@ SQL_CONTRIBUTIONS_TYPE_PRELIMINARY = "%\"reviewtype\": \"preliminary\",%";
 SQL_CONTRIBUTIONS_ADMIN ="\
   SELECT l.user_id, count(*) AS editortotal \
   FROM log_activity AS l \
-  WHERE l.action IN (23, 45) AND \
+  WHERE l.action IN (23, 45) AND l.user_id != 4757633 AND \
         l.arguments LIKE '%%\"addons.addon\"%%' AND \
         l.created >= %s AND l.created < %s \
   GROUP BY l.user_id \
@@ -65,7 +65,7 @@ SQL_CONTRIBUTIONS_ADMIN ="\
 SQL_CONTRIBUTIONS_INFO ="\
   SELECT l.user_id, count(*) AS editortotal \
   FROM log_activity AS l \
-  WHERE l.action IN (44) AND \
+  WHERE l.action IN (44) AND l.user_id != 4757633 AND \
         l.arguments LIKE '%%\"addons.addon\"%%' AND \
         l.created >= %s AND l.created < %s \
   GROUP BY l.user_id \
@@ -85,6 +85,12 @@ SQL_CONTRIBUTIONS_SUM_COMMUNITY = "\
         l.user_id NOT IN ( \
           SELECT DISTINCT(gu.user_id) FROM groups_users AS gu \
           WHERE gu.group_id IN (50000, 50066))";
+SQL_CONTRIBUTIONS_SUM_AUTOMATIC = "\
+  SELECT count(*) \
+  FROM log_activity AS l \
+  WHERE l.action IN (21, 42, 43, 22, 23, 44, 45) AND l.user_id = 4757633 AND \
+        l.arguments LIKE '%%\"addons.addon\"%%' AND \
+        l.created >= %s AND l.created < %s;";
 SQL_MONTH_TOTAL ="\
   SET @from_date=%s;SET @to_date=%s; \
   SELECT \
@@ -249,6 +255,12 @@ def getContributionData(db, startDateStr, endDateStr):
   cursor.close();
   #print(results["contribSumCommunity"]);
 
+  cursor = db.cursor();
+  cursor.execute(SQL_CONTRIBUTIONS_SUM_AUTOMATIC, (startDateStr, endDateStr));
+  results["contribSumAutomatic"] = cursor.fetchone()[0];
+  cursor.close();
+  #print(results["contribSumAutomatic"]);
+
   return;
 
 def getMonthTotalData(db, firstOfMonthStr, firstOfNextMonthStr):
@@ -309,6 +321,8 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
   output += "\nTotal reviews: " + str(results["contribSum"]);
   output += "\nVolunteer reviews: " + str(results["contribSumCommunity"]);
   output += " (" + str(rate(results["contribSumCommunity"], results["contribSum"])) + "%)";
+  output += "\nAutomatic reviews: " + str(results["contribSumAutomatic"]);
+  output += " (" + str(rate(results["contribSumAutomatic"], results["contribSum"])) + "%)";
 
   output += "\n\nTotal contributions:\n\n";
   output += "     Nominations    Updates    Prelim.  Admin flag   Info req  Total\n";
