@@ -364,7 +364,7 @@ def getDoubleTextLine():
   return "==========================================================\n";
 
 def rate(part, total):
-  return int((float(part) / float(total)) * 100);
+  return int(round((float(part) / float(total)) * 100));
 
 def monthlyRateStr(index):
   monthItem = results["monthTotal"][index];
