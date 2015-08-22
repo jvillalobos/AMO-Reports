@@ -13,12 +13,15 @@ SHORT_MONTH_FORMAT = "%b";
 AMO_DB = "addons_mozilla_org";
 SQL_POINTS = "\
   SELECT sum(rs.score) AS total, \
-       CASE WHEN sum(rs.score) >= 96000  THEN 6 \
-            WHEN sum(rs.score) >= 45000  THEN 5 \
-            WHEN sum(rs.score) >= 21000  THEN 4 \
-            WHEN sum(rs.score) >=  8700  THEN 3 \
-            WHEN sum(rs.score) >=  4320  THEN 2 \
-            WHEN sum(rs.score) >=  2160  THEN 1 \
+       CASE WHEN sum(rs.score) >= 3000000  THEN 9 \
+            WHEN sum(rs.score) >= 1200000  THEN 8 \
+            WHEN sum(rs.score) >=  300000  THEN 7 \
+            WHEN sum(rs.score) >=   96000  THEN 6 \
+            WHEN sum(rs.score) >=   45000  THEN 5 \
+            WHEN sum(rs.score) >=   21000  THEN 4 \
+            WHEN sum(rs.score) >=    8700  THEN 3 \
+            WHEN sum(rs.score) >=    4320  THEN 2 \
+            WHEN sum(rs.score) >=    2160  THEN 1 \
             ELSE 0 END AS level, \
        u.display_name \
     FROM reviewer_scores AS rs, users AS u \
@@ -116,6 +119,8 @@ SQL_MONTH_TOTAL ="\
 results = {};
 
 def main():
+  print(
+    "Warning: Using a password on the command line interface can be insecure.");
   if (5 == len(sys.argv)):
     try:
       endDate = datetime.strptime(sys.argv[4], DATE_FORMAT);
@@ -164,7 +169,7 @@ def runReports(endDate):
 
   db.close();
 
-  print("Writting files...");
+  print("Writing files...");
   emailOutput = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
   print(emailOutput);
 
