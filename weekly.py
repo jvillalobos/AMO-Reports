@@ -25,14 +25,25 @@ def main():
   pwd = getpass.getpass();
 
   if (re.match("^\w+$", pwd)):
+    # internal add-ons report.
+    print("Waiting times\n");
+    print(runScript("waiting.sql", pwd));
+    print("Add-on and version creation\n");
+    print(runScript("creation.sql", pwd));
+    print("WebExtensions\n");
+    print(runScript("webextensions.sql", pwd));
+    # internal reviewer report (also used in public forum posting).
     processPoints(runScript("points.sql", pwd));
     processContributions(runScript("contributions.sql", pwd));
     processTotals(runScript("totals.sql", pwd));
     processMonthly(runScript("monthly.sql", pwd));
+
     email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
 
+    print("Reviewer report\n");
     print(
       "SUBJECT: Weekly Add-on Reviews Report, v 0.12, " + endDateStr + "\n");
+    print(email);
   else:
     print("Invalid password.");
 
@@ -86,6 +97,12 @@ def processMonthly(output):
     "info" : columns[3], "total": columns[4] };
   return;
 
+def getReportOutput(startDateStr, endDateStr):
+  output = "Add-ons report\n";
+  output += getDoubleTextLine() + "\n";
+
+
+  return output;
 
 def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
   output = "WEEKLY ADD-ON REVIEWS REPORT\n";

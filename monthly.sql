@@ -1,4 +1,4 @@
-SET @from_date='2016-12-01';SET @to_date='2017-01-01';
+SET @from_date=STR_TO_DATE(CONCAT(EXTRACT(YEAR_MONTH FROM NOW()), "01"),"%Y%m%d"); SET @to_date=DATE_ADD(@from_date, INTERVAL 1 MONTH);
 SELECT
   (SELECT IFNULL(COUNT(*), 0)
    FROM log_activity AS l
