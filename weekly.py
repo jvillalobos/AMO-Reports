@@ -37,6 +37,7 @@ def main():
     processContributions(runScript("contributions.sql", pwd));
     processTotals(runScript("totals.sql", pwd));
     processMonthly(runScript("monthly.sql", pwd));
+    processQueues(runScript("queues.sql", pwd));
 
     email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
 
@@ -95,6 +96,19 @@ def processMonthly(output):
   results["monthly"] = {
     "new" : columns[0], "updates" : columns[1], "admin": columns[2],
     "info" : columns[3], "total": columns[4] };
+  return;
+
+def processQueues(output):
+  lines = output.splitlines();
+  green = lines[1].split();
+  yellow = lines[2].split();
+  red = lines[3].split();
+  results["queue_new"] = {
+    "green" : green[1], "yellow" : yellow[1], "red": red[1],
+    "total" : str(int(green[1]) + int(yellow[1]) + int(red[1])) };
+  results["queue_updates"] = {
+    "green" : green[2], "yellow" : yellow[2], "red": red[2],
+    "total" : str(int(green[2]) + int(yellow[2]) + int(red[2])) };
   return;
 
 def getReportOutput(startDateStr, endDateStr):
@@ -163,6 +177,27 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
   output += str(monthlyRateStr("info")).rjust(12);
   output += str(results["monthly"]["total"]).rjust(7);
 
+  output += "\n\nREVIEW QUEUE STATE:\n"
+  output += getTextLine();
+
+  output += "\n* New add-ons *\n";
+  output += "\nQueue length by waiting times:\n";
+  output += "\n             10 days+     5-10 days       5 days-    Total\n";
+  output += "Now    ";
+  output += str(queueRateStr("queue_new", "red")).rjust(14);
+  output += str(queueRateStr("queue_new", "yellow")).rjust(14);
+  output += str(queueRateStr("queue_new", "green")).rjust(14);
+  output += str(results["queue_new"]["total"]).rjust(9);
+
+  output += "\n\n* Updates *\n";
+  output += "\nQueue length by waiting times:\n";
+  output += "\n             10 days+     5-10 days       5 days-    Total\n";
+  output += "Now    ";
+  output += str(queueRateStr("queue_updates", "red")).rjust(14);
+  output += str(queueRateStr("queue_updates", "yellow")).rjust(14);
+  output += str(queueRateStr("queue_updates", "green")).rjust(14);
+  output += str(results["queue_updates"]["total"]).rjust(9);
+
   output += "\n\nMORE:\n";
   output += getTextLine();
   output += "https://addons.mozilla.org/editors/performance\n";
@@ -182,6 +217,13 @@ def monthlyRateStr(index):
   monthItem = results["monthly"][index];
   rateStr = monthItem + " (";
   rateStr += str(rate(monthItem, results["monthly"]["total"])) + "%)";
+
+  return rateStr;
+
+def queueRateStr(queue, color):
+  queueItem = results[queue][color];
+  rateStr = queueItem + " (";
+  rateStr += str(rate(queueItem, results[queue]["total"])) + "%)";
 
   return rateStr;
 
