@@ -1,5 +1,5 @@
 SET @from_date=DATE_SUB(NOW(), INTERVAL 7 DAY); SET @to_date=NOW();
-SELECT times.review_time AS `Waiting`, COUNT(*) AS `Total`
+SELECT times.review_time AS `Waiting`, COUNT(DISTINCT(v.id)) AS `Total`
 FROM
   (SELECT f.version_id,
     CASE
@@ -10,6 +10,5 @@ FROM
    FROM files AS f
    WHERE f.reviewed >= @from_date AND f.reviewed < @to_date
    GROUP BY f.version_id) AS `times`
-  JOIN versions AS v ON (times.version_id = v.id)
-  JOIN addons AS a ON (v.addon_id = a.id AND  a.is_listed = 1)
+  JOIN versions AS v ON (times.version_id = v.id AND v.channel = 2)
 GROUP BY times.review_time;

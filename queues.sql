@@ -10,7 +10,6 @@ FROM
   FROM files AS f
   JOIN versions AS v ON (f.status = 1 AND f.version_id = v.id)
   JOIN addons AS a ON
-    (a.status IN (3,4) AND v.addon_id = a.id AND a.inactive = 0 AND
-     a.is_listed = 1)
+    (a.status IN (3,4) AND v.addon_id = a.id AND a.inactive = 0)
   GROUP BY a.id) AS `queues`
 GROUP BY queues.waiting;
