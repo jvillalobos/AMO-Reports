@@ -1,60 +1,78 @@
 #!/usr/bin/env python
 
+import sys;
 import subprocess;
 import getpass;
 import re;
 from datetime import date, datetime, timedelta;
 
 AMO_DB = "addons_mozilla_org";
-AMO_DB_USER = "jvillalobos";
-AMO_DB_SERVER = "db-slave-amoprod1.amo.us-west-2.prod.mozaws.net";
 DATE_FORMAT = "%Y-%m-%d";
 SHORT_MONTH_FORMAT = "%b";
 
+# DB access information.
+db_access = { "host" : "", "user" : "", "password" : ""};
 # this is where we'll store all the DB results.
 results = {};
 
 def main():
+  if (3 == len(sys.argv)):
+    if ((None != re.match("^[\w\.\-]+$", sys.argv[1])) &
+        (None != re.match("^\w+$", sys.argv[2]))):
+      # get password from standard input.
+      pwd = getpass.getpass();
+
+      if (re.match("^\w+$", pwd)):
+          db_access["host"] = sys.argv[1];
+          db_access["user"] = sys.argv[2];
+          db_access["password"] = pwd;
+          runReport();
+      else:
+        print("Invalid password.");
+    else:
+      print("Invalid host or username.");
+  else:
+    print("Usage: " + sys.argv[0] + " host username");
+    print("Example:");
+    print("\t" + sys.argv[0] + " db.example.com johndoe");
+
+  return;
+
+def runReport():
   endDate = date.today();
   startDate = endDate - timedelta(days=7);
   startDateStr = startDate.strftime(DATE_FORMAT);
   endDateStr = endDate.strftime(DATE_FORMAT);
   endDateMonthStr = endDate.strftime(SHORT_MONTH_FORMAT);
 
-  # get password from standard input.
-  pwd = getpass.getpass();
+  # internal add-ons report.
+  print("Waiting times\n");
+  print(runScript("waiting.sql"));
+  print("Add-on and version creation\n");
+  print(runScript("creation.sql"));
+  print("WebExtensions\n");
+  print(runScript("webextensions.sql"));
 
-  if (re.match("^\w+$", pwd)):
-    # internal add-ons report.
-    print("Waiting times\n");
-    print(runScript("waiting.sql", pwd));
-    print("Add-on and version creation\n");
-    print(runScript("creation.sql", pwd));
-    print("WebExtensions\n");
-    print(runScript("webextensions.sql", pwd));
-    # internal reviewer report (also used in public forum posting).
-    processPoints(runScript("points.sql", pwd));
-    processContributions(runScript("contributions.sql", pwd));
-    processTotals(runScript("totals.sql", pwd));
-    processMonthly(runScript("monthly.sql", pwd));
-    processQueues(runScript("queues.sql", pwd));
+  # internal reviewer report (also used in public forum posting).
+  processPoints(runScript("points.sql"));
+  processContributions(runScript("contributions.sql"));
+  processTotals(runScript("totals.sql"));
+  processMonthly(runScript("monthly.sql"));
+  processQueues(runScript("queues.sql"));
 
-    email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
+  email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
 
-    print("Reviewer report\n");
-    print(
-      "SUBJECT: Weekly Add-on Reviews Report, v 0.12, " + endDateStr + "\n");
-    print(email);
-  else:
-    print("Invalid password.");
-
+  print("Reviewer report\n");
+  print(
+    "SUBJECT: Weekly Add-on Reviews Report, v 0.12, " + endDateStr + "\n");
+  print(email);
   return;
 
-def runScript(filename, password):
+def runScript(filename):
   script = open(filename);
   output = subprocess.check_output(
-    [ "mysql", ("-h" + AMO_DB_SERVER), AMO_DB, ("-u" + AMO_DB_USER),
-     ("-p" + password) ],
+    [ "mysql", ("-h" + db_access["host"]), AMO_DB, ("-u" + db_access["user"]),
+     ("-p" + db_access["password"]) ],
     stdin=script);
   script.close();
   #print("Output:\n" + output);
