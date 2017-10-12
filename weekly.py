@@ -45,26 +45,36 @@ def runReport():
   endDateStr = endDate.strftime(DATE_FORMAT);
   endDateMonthStr = endDate.strftime(SHORT_MONTH_FORMAT);
 
+  # run all the scripts first to get the server warnings out of the way.
+  waiting = runScript("waiting.sql");
+  creation = runScript("creation.sql");
+  webextensions = runScript("webextensions.sql");
+  points = runScript("points.sql");
+  contributions = runScript("contributions.sql");
+  totals = runScript("totals.sql");
+  monthly = runScript("monthly.sql");
+  post = runScript("post.sql");
+
   # internal add-ons report.
-  print("Waiting times\n");
-  print(runScript("waiting.sql"));
+  print("\nWaiting times\n");
+  print(waiting);
   print("Add-on and version creation\n");
-  print(runScript("creation.sql"));
+  print(creation);
   print("WebExtensions\n");
-  print(runScript("webextensions.sql"));
+  print(webextensions);
 
   # internal reviewer report (also used in public forum posting).
-  processPoints(runScript("points.sql"));
-  processContributions(runScript("contributions.sql"));
-  processTotals(runScript("totals.sql"));
-  processMonthly(runScript("monthly.sql"));
-  processQueues(runScript("queues.sql"));
+  processPoints(points);
+  processContributions(contributions);
+  processTotals(totals);
+  processMonthly(monthly);
+  processPostReview(post);
 
   email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
 
   print("Reviewer report\n");
   print(
-    "SUBJECT: Weekly Add-on Reviews Report, v 0.12, " + endDateStr + "\n");
+    "SUBJECT: Weekly Add-on Reviews Report, v1.0, " + endDateStr + "\n");
   print(email);
   return;
 
@@ -95,10 +105,9 @@ def processContributions(output):
   del lines[0];
 
   for line in lines:
-      columns = line.split(None, 5);
+      columns = line.split(None, 2);
       results["contributions"].append(
-        { "total" : columns[0], "new" : columns[1], "updates": columns[2],
-          "admin" : columns[3], "info": columns[4], "name": columns[5] });
+        { "total" : columns[0], "admin": columns[1], "name" : columns[2] });
   return;
 
 def processTotals(output):
@@ -110,29 +119,27 @@ def processTotals(output):
 
 def processMonthly(output):
   lines = output.splitlines();
-  columns = lines[1].split();
-  results["monthly"] = {
-    "new" : columns[0], "updates" : columns[1], "admin": columns[2],
-    "info" : columns[3], "total": columns[4] };
+  results["monthly"] = lines[1];
   return;
 
-def processQueues(output):
-  lines = output.splitlines();
-  green = lines[1].split();
-  yellow = lines[2].split();
-  red = lines[3].split();
-  results["queue_new"] = {
-    "green" : green[1], "yellow" : yellow[1], "red": red[1],
-    "total" : str(int(green[1]) + int(yellow[1]) + int(red[1])) };
-  results["queue_updates"] = {
-    "green" : green[2], "yellow" : yellow[2], "red": red[2],
-    "total" : str(int(green[2]) + int(yellow[2]) + int(red[2])) };
+def processPostReview(output):
+  # remove fist line.
+  lines = output.splitlines()[1:];
+
+  results["post_review"] = {};
+  total = 0;
+
+  for line in lines:
+    columns = line.split();
+    results["post_review"][columns[0]] = int(columns[1]);
+    total += int(columns[1]);
+
+  results["post_review"]["total"] = str(total);
   return;
 
 def getReportOutput(startDateStr, endDateStr):
   output = "Add-ons report\n";
   output += getDoubleTextLine() + "\n";
-
 
   return output;
 
@@ -156,27 +163,23 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
   output += "\nSee also: https://addons.mozilla.org/editors/leaderboard/\n\n";
   output += "CONTRIBUTIONS (5 reviews or more):\n"
   output += getTextLine() + "\n";
-  output += "Total   New   Upd   Adm   Inf   Name\n";
+  output += "Total   Name\n";
 
   for contribEntry in results["contributions"]:
     total = int(contribEntry["total"]);
 
     if (5 <= total):
       output += contribEntry["total"].rjust(5);
-      output += contribEntry["new"].rjust(6);
-      output += contribEntry["updates"].rjust(6);
-      output += contribEntry["admin"].rjust(6);
-      output += contribEntry["info"].rjust(6);
-      output += "   " + contribEntry["name"] + "\n";
+      output += "   " + contribEntry["name"];
+
+      if ("1" == contribEntry["admin"]):
+        output += " *";
+
+      output += "\n";
     else:
       break;
 
   output += "\n* - Non-volunteers\n\n";
-
-  output += "New - New add-ons, approved or denied.\n";
-  output += "Upd - Updates, approved or denied.\n";
-  output += "Adm - Escalations for admin review.\n";
-  output += "Inf - Information requests to authors for updates and nominations.\n";
   output += "\nVolunteer contribution ratio:\n";
 
   totalHuman = int(results["totals"]["total"]) - int(results["totals"]["auto"]);
@@ -184,41 +187,21 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
   output += "\nTotal reviews: " + str(totalHuman);
   output += "\nVolunteer reviews: " + results["totals"]["community"];
   output += " (" + str(rate(results["totals"]["community"], totalHuman)) + "%)";
-  output += "\n\nAutomatic (unlisted) reviews: " + str(results["totals"]["auto"]);
+  output += "\n\nAutomatic reviews: " + str(results["totals"]["auto"]);
 
   output += "\n\nTotal contributions (listed):\n\n";
-  output += "     New add-ons    Updates  Admin flag    Info req  Total\n";
   output += endDateMonthStr.ljust(5)
-  output += str(monthlyRateStr("new")).rjust(11);
-  output += str(monthlyRateStr("updates")).rjust(11)
-  output += str(monthlyRateStr("admin")).rjust(12);
-  output += str(monthlyRateStr("info")).rjust(12);
-  output += str(results["monthly"]["total"]).rjust(7);
+  output += str(results["monthly"]);
 
-  output += "\n\nREVIEW QUEUE STATE:\n"
+  output += "\n\nPOST-REVIEW:\n"
   output += getTextLine();
 
-  output += "\n* New add-ons *\n";
-  output += "\nQueue length by waiting times:\n";
-  output += "\n             10 days+     5-10 days       5 days-    Total\n";
-  output += "Now    ";
-  output += str(queueRateStr("queue_new", "red")).rjust(14);
-  output += str(queueRateStr("queue_new", "yellow")).rjust(14);
-  output += str(queueRateStr("queue_new", "green")).rjust(14);
-  output += str(results["queue_new"]["total"]).rjust(9);
-
-  output += "\n\n* Updates *\n";
-  output += "\nQueue length by waiting times:\n";
-  output += "\n             10 days+     5-10 days       5 days-    Total\n";
-  output += "Now    ";
-  output += str(queueRateStr("queue_updates", "red")).rjust(14);
-  output += str(queueRateStr("queue_updates", "yellow")).rjust(14);
-  output += str(queueRateStr("queue_updates", "green")).rjust(14);
-  output += str(results["queue_updates"]["total"]).rjust(9);
-
-  output += "\n\nMORE:\n";
-  output += getTextLine();
-  output += "https://addons.mozilla.org/editors/performance\n";
+  output += "\nTotal: " + results["post_review"]["total"] + "\n";
+  output += "\n* Risk *";
+  output += ("\nHighest:").ljust(10) + str(postRateStr("highest"));
+  output += ("\nHigh:").ljust(10) + str(postRateStr("high"));
+  output += ("\nMedium:").ljust(10) + str(postRateStr("medium"));
+  output += ("\nLow:").ljust(10) + str(postRateStr("low"));
 
   return output;
 
@@ -231,17 +214,14 @@ def getDoubleTextLine():
 def rate(part, total):
   return int(round((float(part) / float(total)) * 100));
 
-def monthlyRateStr(index):
-  monthItem = results["monthly"][index];
-  rateStr = monthItem + " (";
-  rateStr += str(rate(monthItem, results["monthly"]["total"])) + "%)";
+def postRateStr(risk):
+  count = 0;
 
-  return rateStr;
+  if (risk in results["post_review"]):
+    count = results["post_review"][risk];
 
-def queueRateStr(queue, color):
-  queueItem = results[queue][color];
-  rateStr = queueItem + " (";
-  rateStr += str(rate(queueItem, results[queue]["total"])) + "%)";
+  rateStr = str(count) + " (";
+  rateStr += str(rate(count, results["post_review"]["total"])) + "%)";
 
   return rateStr;
 

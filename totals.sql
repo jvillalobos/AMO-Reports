@@ -3,13 +3,13 @@ SELECT all.total AS `Total`, community.total AS `Community`,
        automatic.total AS `Auto` FROM
   (SELECT COUNT(*) AS `total`
    FROM log_activity AS l
-   WHERE l.action IN (21, 42, 43, 22, 23, 44, 45) AND
+   WHERE l.action IN (21, 42, 43, 22, 23, 44, 45, 144) AND
          l.arguments LIKE '%"addons.addon"%' AND
          l.created >= @from_date AND l.created < @to_date) AS `all`
   JOIN
   (SELECT COUNT(*) AS `total`
    FROM log_activity AS l
-   WHERE l.action IN (21, 42, 43, 22, 23, 44, 45) AND
+   WHERE l.action IN (21, 42, 43, 22, 23, 44, 45, 144) AND
          l.arguments LIKE '%"addons.addon"%' AND
          l.created >= @from_date AND l.created < @to_date AND
          l.user_id NOT IN (
@@ -18,6 +18,6 @@ SELECT all.total AS `Total`, community.total AS `Community`,
   JOIN
   (SELECT COUNT(*) AS `total`
    FROM log_activity AS l
-   WHERE l.action IN (21, 42, 43, 22, 23, 44, 45) AND l.user_id = 4757633 AND
+   WHERE l.action IN (21, 42, 43, 22, 23, 44, 45, 144) AND l.user_id = 4757633 AND
         l.arguments LIKE '%"addons.addon"%' AND
         l.created >= @from_date AND l.created < @to_date) AS `automatic`;
