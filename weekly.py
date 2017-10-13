@@ -72,9 +72,8 @@ def runReport():
 
   email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
 
-  print("Reviewer report\n");
   print(
-    "SUBJECT: Weekly Add-on Reviews Report, v1.0, " + endDateStr + "\n");
+    "Weekly Add-on Reviews Report, v1.0, " + endDateStr + "\n");
   print(email);
   return;
 
@@ -179,7 +178,7 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
     else:
       break;
 
-  output += "\n* - Non-volunteers\n\n";
+  output += "\n* - Non-volunteers\n";
   output += "\nVolunteer contribution ratio:\n";
 
   totalHuman = int(results["totals"]["total"]) - int(results["totals"]["auto"]);
@@ -198,10 +197,10 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
 
   output += "\nTotal: " + results["post_review"]["total"] + "\n";
   output += "\n* Risk *";
-  output += ("\nHighest:").ljust(10) + str(postRateStr("highest"));
-  output += ("\nHigh:").ljust(10) + str(postRateStr("high"));
-  output += ("\nMedium:").ljust(10) + str(postRateStr("medium"));
-  output += ("\nLow:").ljust(10) + str(postRateStr("low"));
+  output += ("\nHighest:").ljust(10) + str(postRateStr("highest")).rjust(11);
+  output += ("\nHigh:").ljust(10) + str(postRateStr("high")).rjust(11);
+  output += ("\nMedium:").ljust(10) + str(postRateStr("medium")).rjust(11);
+  output += ("\nLow:").ljust(10) + str(postRateStr("low")).rjust(11);
 
   return output;
 
