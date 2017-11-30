@@ -46,7 +46,6 @@ def runReport():
   endDateMonthStr = endDate.strftime(SHORT_MONTH_FORMAT);
 
   # run all the scripts first to get the server warnings out of the way.
-  waiting = runScript("waiting.sql");
   creation = runScript("creation.sql");
   webextensions = runScript("webextensions.sql");
   points = runScript("points.sql");
@@ -56,9 +55,7 @@ def runReport():
   post = runScript("post.sql");
 
   # internal add-ons report.
-  print("\nWaiting times\n");
-  print(waiting);
-  print("Add-on and version creation\n");
+  print("\nAdd-on and version creation\n");
   print(creation);
   print("WebExtensions\n");
   print(webextensions);
@@ -73,7 +70,7 @@ def runReport():
   email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
 
   print(
-    "Weekly Add-on Reviews Report, v1.0, " + endDateStr + "\n");
+    "Weekly Add-on Reviews Report, v1.1, " + endDateStr + "\n");
   print(email);
   return;
 
@@ -160,7 +157,7 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
       break;
 
   output += "\nSee also: https://addons.mozilla.org/editors/leaderboard/\n\n";
-  output += "CONTRIBUTIONS (5 reviews or more):\n"
+  output += "CONTRIBUTIONS (5 reviews or more, code or content):\n"
   output += getTextLine() + "\n";
   output += "Total   Name\n";
 
