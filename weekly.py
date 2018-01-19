@@ -90,7 +90,9 @@ def processPoints(output):
   del lines[0];
 
   for line in lines:
-      columns = line.split(None, 2);
+    columns = line.split(None, 2);
+
+    if (3 == len(columns)):
       results["points"].append(
         { "total" : columns[0], "level" : columns[1], "name": columns[2] });
   return;
@@ -101,7 +103,9 @@ def processContributions(output):
   del lines[0];
 
   for line in lines:
-      columns = line.split(None, 2);
+    columns = line.split(None, 2);
+
+    if (3 == len(columns)):
       results["contributions"].append(
         { "total" : columns[0], "admin": columns[1], "name" : columns[2] });
   return;
