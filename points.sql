@@ -13,9 +13,10 @@ SELECT SUM(rs.score) AS 'Total',
 FROM reviewer_scores AS rs
 INNER JOIN users AS u ON (rs.user_id = u.id)
 INNER JOIN groups_users AS gu
-  ON (gu.group_id = 50002 AND u.id = gu.user_id AND
-      u.id NOT IN (
-        SELECT gu2.user_id FROM groups_users AS gu2
-        WHERE gu2.group_id IN (50000, 50066)))
+  ON (gu.group_id IN (50002, 50094, 50096) AND u.id = gu.user_id)
+WHERE
+  u.id NOT IN (
+    SELECT gu2.user_id FROM groups_users AS gu2
+    WHERE gu2.group_id IN (50000, 50066))
 GROUP BY rs.user_id
 ORDER BY SUM(rs.score) DESC;
