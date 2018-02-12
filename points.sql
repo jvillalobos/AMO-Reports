@@ -12,9 +12,10 @@ SELECT SUM(rs.score) AS 'Total',
        REPLACE(u.display_name, 'Ż', 'Z') AS 'Name'
 FROM reviewer_scores AS rs
 INNER JOIN users AS u ON (rs.user_id = u.id)
-INNER JOIN groups_users AS gu
-  ON (gu.group_id IN (50002, 50094, 50096) AND u.id = gu.user_id)
 WHERE
+  u.id IN (
+    SELECT DISTINCT(gu1.user_id) FROM groups_users AS gu1
+    WHERE gu1.group_id IN (50002, 50094, 50096)) AND
   u.id NOT IN (
     SELECT gu2.user_id FROM groups_users AS gu2
     WHERE gu2.group_id IN (50000, 50066))
