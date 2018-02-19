@@ -1,5 +1,5 @@
 SET @from_date=DATE_SUB(NOW(), INTERVAL 7 DAY); SET @to_date=NOW();
-SELECT COUNT(*) AS 'Total',
+SELECT COUNT(DISTINCT(DATE_FORMAT(l.created, '%Y-%m-%d %H:%i:00'))) AS `Total`,
        u.id IN
          (SELECT gu.user_id FROM groups_users AS gu WHERE gu.group_id = "50066")
        AS `Admin`,
