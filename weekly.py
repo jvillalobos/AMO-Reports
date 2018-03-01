@@ -51,7 +51,6 @@ def runReport():
   points = runScript("points.sql");
   contributions = runScript("contributions.sql");
   totals = runScript("totals.sql");
-  monthly = runScript("monthly.sql");
   post = runScript("post.sql");
 
   # internal add-ons report.
@@ -64,7 +63,6 @@ def runReport():
   processPoints(points);
   processContributions(contributions);
   processTotals(totals);
-  processMonthly(monthly);
   processPostReview(post);
 
   email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
@@ -115,11 +113,6 @@ def processTotals(output):
   columns = lines[1].split();
   results["totals"] = {
     "total" : columns[0], "community" : columns[1], "auto": columns[2] };
-  return;
-
-def processMonthly(output):
-  lines = output.splitlines();
-  results["monthly"] = lines[1];
   return;
 
 def processPostReview(output):
@@ -188,10 +181,6 @@ def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
   output += "\nVolunteer reviews: " + results["totals"]["community"];
   output += " (" + str(rate(results["totals"]["community"], totalHuman)) + "%)";
   output += "\n\nAutomatic reviews: " + str(results["totals"]["auto"]);
-
-  output += "\n\nTotal contributions (listed):\n\n";
-  output += endDateMonthStr.ljust(5)
-  output += str(results["monthly"]);
 
   output += "\n\nPOST-REVIEW:\n"
   output += getTextLine();
