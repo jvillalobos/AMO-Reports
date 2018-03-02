@@ -68,7 +68,7 @@ def runReport():
   email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
 
   print(
-    "Weekly Add-on Reviews Report, v1.1, " + endDateStr + "\n");
+    "Weekly Add-on Reviews Report, v1.2, " + endDateStr + "\n");
   print(email);
   return;
 
