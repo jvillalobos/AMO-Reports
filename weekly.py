@@ -1,217 +1,184 @@
 #!/usr/bin/env python
+from __future__ import print_function
 
-import sys;
-import subprocess;
-import getpass;
-import re;
-from datetime import date, datetime, timedelta;
+import sys
+import subprocess
+import getpass
+import re
+import os
+import csv
+import calendar
+import tempfile
 
-AMO_DB = "addons_mozilla_org";
-DATE_FORMAT = "%Y-%m-%d";
-SHORT_MONTH_FORMAT = "%b";
+from StringIO import StringIO
+from datetime import date, timedelta
+
+
+AMO_DB = "addons_mozilla_org"
+DATE_FORMAT = "%Y-%m-%d"
+JUICE = os.environ.get("JUICE", "juice")
 
 # DB access information.
-db_access = { "host" : "", "user" : "", "password" : ""};
-# this is where we'll store all the DB results.
-results = {};
+db_access = {"host": "", "user": "", "password": ""}
+
 
 def main():
-  if (3 == len(sys.argv)):
-    if ((None != re.match("^[\w\.\-]+$", sys.argv[1])) &
-        (None != re.match("^\w+$", sys.argv[2]))):
-      # get password from standard input.
-      pwd = getpass.getpass();
+    if (3 == len(sys.argv)):
+        if re.match("^[\w\.\-]+$", sys.argv[1]) and \
+           re.match("^\w+$", sys.argv[2]):
+            # get password from standard input.
+            pwd = getpass.getpass()
 
-      if (re.match("^\w+$", pwd)):
-          db_access["host"] = sys.argv[1];
-          db_access["user"] = sys.argv[2];
-          db_access["password"] = pwd;
-          runReport();
-      else:
-        print("Invalid password.");
+            if (re.match("^\w+$", pwd)):
+                db_access["host"] = sys.argv[1]
+                db_access["user"] = sys.argv[2]
+                db_access["password"] = pwd
+                runReport()
+            else:
+                print("Invalid password.")
+        else:
+            print("Invalid host or username.")
     else:
-      print("Invalid host or username.");
-  else:
-    print("Usage: " + sys.argv[0] + " host username");
-    print("Example:");
-    print("\t" + sys.argv[0] + " db.example.com johndoe");
+        print("Usage: " + sys.argv[0] + " host username")
+        print("Example:")
+        print("\t" + sys.argv[0] + " db.example.com johndoe")
 
-  return;
 
 def runReport():
-  endDate = date.today();
-  startDate = endDate - timedelta(days=7);
-  startDateStr = startDate.strftime(DATE_FORMAT);
-  endDateStr = endDate.strftime(DATE_FORMAT);
-  endDateMonthStr = endDate.strftime(SHORT_MONTH_FORMAT);
+    endDate = date.today()
+    startDate = endDate - timedelta(days=7)
+    startDateStr = startDate.strftime(DATE_FORMAT)
+    endDateStr = endDate.strftime(DATE_FORMAT)
 
-  # run all the scripts first to get the server warnings out of the way.
-  creation = runScript("creation.sql");
-  webextensions = runScript("webextensions.sql");
-  points = runScript("points.sql");
-  contributions = runScript("contributions.sql");
-  totals = runScript("totals.sql");
-  post = runScript("post.sql");
+    quarterNumber = (endDate.month - 1) / 3 + 1
+    quarterEndMonth = quarterNumber * 3
+    quarterStart = date(endDate.year, (quarterNumber - 1) * 3 + 1, 1)
+    quarterEnd = date(endDate.year, quarterEndMonth,
+                      calendar.monthrange(endDate.year, quarterEndMonth)[1])
 
-  # internal add-ons report.
-  print("\nAdd-on and version creation\n");
-  print(creation);
-  print("WebExtensions\n");
-  print(webextensions);
+    print(getEmailOutput(startDateStr, endDateStr, quarterStart, quarterEnd))
 
-  # internal reviewer report (also used in public forum posting).
-  processPoints(points);
-  processContributions(contributions);
-  processTotals(totals);
-  processPostReview(post);
-
-  email = getEmailOutput(startDateStr, endDateStr, endDateMonthStr);
-
-  print(
-    "Weekly Add-on Reviews Report, v1.2, " + endDateStr + "\n");
-  print(email);
-  return;
 
 def runScript(filename):
-  script = open(filename);
-  output = subprocess.check_output(
-    [ "mysql", ("-h" + db_access["host"]), AMO_DB, ("-u" + db_access["user"]),
-     ("-p" + db_access["password"]) ],
-    stdin=script);
-  script.close();
-  #print("Output:\n" + output);
-  return output;
+    script = open(filename)
 
-def processPoints(output):
-  results["points"] = [];
-  lines = output.splitlines();
-  del lines[0];
+    output = subprocess.check_output([
+        "mysql", ("-h" + db_access["host"]), AMO_DB,
+        ("-u" + db_access["user"]), ("-p" + db_access["password"])
+    ], stdin=script)
 
-  for line in lines:
-    columns = line.split(None, 2);
+    script.close()
+    # print("Output:\n" + output)
+    return output
 
-    if (3 == len(columns)):
-      results["points"].append(
-        { "total" : columns[0], "level" : columns[1], "name": columns[2] });
-  return;
 
-def processContributions(output):
-  results["contributions"] = [];
-  lines = output.splitlines();
-  del lines[0];
+def table(headers, csvdata):
+    html = ""
+    html += "<table>\n"
+    csvstream = StringIO(csvdata.strip())
+    reader = csv.reader(csvstream, delimiter="\t", lineterminator="\n")
+    html += "<tr><th>" + "</th><th>".join(headers) + "</th></tr>\n"
 
-  for line in lines:
-    columns = line.split(None, 2);
+    for values in reader:
+        html += "<tr><td>" + "</td><td>".join(values) + "</td></tr>\n"
 
-    if (3 == len(columns)):
-      results["contributions"].append(
-        { "total" : columns[0], "admin": columns[1], "name" : columns[2] });
-  return;
+    html += "</table>\n"
+    return html
 
-def processTotals(output):
-  lines = output.splitlines();
-  columns = lines[1].split();
-  results["totals"] = {
-    "total" : columns[0], "community" : columns[1], "auto": columns[2] };
-  return;
 
-def processPostReview(output):
-  # remove fist line.
-  lines = output.splitlines()[1:];
+def section(name, tableheaders, filename):
+    heading = "<h3>{}</h3>".format(name)
+    tabledata = runScript(filename)
+    return heading + table(tableheaders, tabledata)
 
-  results["post_review"] = {};
-  total = 0;
 
-  for line in lines:
-    columns = line.split();
-    results["post_review"][columns[0]] = int(columns[1]);
-    total += int(columns[1]);
+def juiceit(html):
+    with tempfile.NamedTemporaryFile() as htmlfile:
+        with open(htmlfile.name, "w") as fd:
+            fd.write(html)
 
-  results["post_review"]["total"] = str(total);
-  return;
+        with tempfile.NamedTemporaryFile() as outfile:
+            subprocess.check_call([JUICE, htmlfile.name, outfile.name])
 
-def getReportOutput(startDateStr, endDateStr):
-  output = "Add-ons report\n";
-  output += getDoubleTextLine() + "\n";
+            with open(outfile.name) as fd:
+                output = fd.read()
 
-  return output;
+    return output
 
-def getEmailOutput(startDateStr, endDateStr, endDateMonthStr):
-  output = "WEEKLY ADD-ON REVIEWS REPORT\n";
-  output += startDateStr + " - " + endDateStr + "\n";
-  output += getDoubleTextLine() + "\n";
-  output += "SCORES AND LEVELS (level 1 and above):\n"
-  output += getTextLine() + "\n";
-  output += "  Total  Level   Name\n";
 
-  for pointEntry in results["points"]:
-    level = int(pointEntry["level"]);
+def getEmailOutput(startDate, endDate, quarterStart, quarterEnd):
+    html = """
+      <style>
+        * {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+              Helvetica, Arial, sans-serif, "Apple Color Emoji",
+              "Segoe UI Emoji", "Segoe UI Symbol";
+        }
 
-    if (0 < level):
-      output += pointEntry["total"].rjust(7) + pointEntry["level"].rjust(7);
-      output += "   " + pointEntry["name"] + "\n";
-    else:
-      break;
+        h1, h2 {
+          margin: 0;
+          padding: 0;
+        }
 
-  output += "\nSee also: https://addons.mozilla.org/editors/leaderboard/\n\n";
-  output += "CONTRIBUTIONS (5 reviews or more, code or content):\n"
-  output += getTextLine() + "\n";
-  output += "Total   Name\n";
+        th {
+          text-align: left;
+          font-weight: bold;
+        }
 
-  for contribEntry in results["contributions"]:
-    total = int(contribEntry["total"]);
+        td {
+          font-weight: normal;
+        }
 
-    if (5 <= total):
-      output += contribEntry["total"].rjust(5);
-      output += "   " + contribEntry["name"];
+        th, td {
+          padding: 0 8px;
+          white-space: nowrap;
+        }
 
-      if ("1" == contribEntry["admin"]):
-        output += " *";
+        td:not(:first-child) {
+          text-align: right;
+        }
+      </style>
+    """
 
-      output += "\n";
-    else:
-      break;
+    html += """
+      <h1>Weekly Add-on Reviews Report</h1>
+      <h2>{start} &ndash; {end}<h2>
+    """.format(start=startDate, end=endDate)
 
-  output += "\n* - Non-volunteers\n";
-  output += "\nVolunteer contribution ratio:\n";
+    html += section(
+        "Weekly Contributions, 5 Reviews or More",
+        ("Name", "Staff", "Total Risk", "Average Risk", "Points",
+         "Add-ons Reviewed"),
+        "weekly.sql"
+    )
 
-  totalHuman = int(results["totals"]["total"]) - int(results["totals"]["auto"]);
+    html += section(
+        "Volunteer Contribution Ratio",
+        ("Group", "Total Risk", "Average Risk", "Add-ons Reviewed"),
+        "ratio.sql"
+    )
 
-  output += "\nTotal reviews: " + str(totalHuman);
-  output += "\nVolunteer reviews: " + results["totals"]["community"];
-  output += " (" + str(rate(results["totals"]["community"], totalHuman)) + "%)";
-  output += "\n\nAutomatic reviews: " + str(results["totals"]["auto"]);
+    html += section(
+        "Risk Profiles Reviewed",
+        ("Risk Category", "All Reviewers", "Volunteers"),
+        "risk.sql"
+    )
 
-  output += "\n\nPOST-REVIEW:\n"
-  output += getTextLine();
+    html += section(
+        "Risk Profiles Reviewed",
+        ("Risk Category", "All Reviewers", "Volunteers"),
+        "risk.sql"
+    )
 
-  output += "\nTotal: " + results["post_review"]["total"] + "\n";
-  output += "\n* Risk *";
-  output += ("\nHighest:").ljust(10) + str(postRateStr("highest")).rjust(11);
-  output += ("\nHigh:").ljust(10) + str(postRateStr("high")).rjust(11);
-  output += ("\nMedium:").ljust(10) + str(postRateStr("medium")).rjust(11);
-  output += ("\nLow:").ljust(10) + str(postRateStr("low")).rjust(11);
+    html += section(
+        "Quarterly contributions ({} &ndash; {})".format(quarterStart,
+                                                         quarterEnd),
+        ("Name", "Points", "Add-ons Reviewed"),
+        "quarterly.sql"
+    )
 
-  return output;
+    return juiceit(html)
 
-def getTextLine():
-  return "----------------------------------------------------------\n";
 
-def getDoubleTextLine():
-  return "==========================================================\n";
-
-def rate(part, total):
-  return int(round((float(part) / float(total)) * 100));
-
-def postRateStr(risk):
-  count = 0;
-
-  if (risk in results["post_review"]):
-    count = results["post_review"][risk];
-
-  rateStr = str(count) + " (";
-  rateStr += str(rate(count, results["post_review"]["total"])) + "%)";
-
-  return rateStr;
-
-main();
+if __name__ == "__main__":
+    main()
